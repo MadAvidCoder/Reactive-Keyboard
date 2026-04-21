@@ -1,0 +1,14 @@
+target
+
+*.bin
+*.elf
+*.hex
+*.uf2
+
+.DS_Store
+target/
+.idea/
+.cargo/credentials.toml
+.cargo-ok
+
+nrf-sdc/
