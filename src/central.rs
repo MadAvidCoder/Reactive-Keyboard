@@ -5,6 +5,7 @@ mod vial;
 #[macro_use]
 mod macros;
 mod keymap;
+mod rgb;
 
 use defmt::{info, unwrap};
 use defmt_rtt as _;
@@ -30,7 +31,7 @@ use rmk::config::{
 };
 use rmk::debounce::default_debouncer::DefaultDebouncer;
 use rmk::event::*;
-use rmk::futures::future::{join4, join5};
+use rmk::futures::future::{join, join4, join5};
 use rmk::input_device::Runnable;
 use rmk::input_device::adc::{AnalogEventType, NrfAdc};
 use rmk::input_device::battery::BatteryProcessor;
@@ -41,6 +42,8 @@ use rmk::split::central::run_peripheral_manager;
 use rmk::{HostResources, KeymapData, initialize_keymap_and_storage, run_all, run_rmk};
 use static_cell::StaticCell;
 use vial::{VIAL_KEYBOARD_DEF, VIAL_KEYBOARD_ID};
+use ws2812_spi::Ws2812;
+use embassy_nrf::pwm::{SimplePwm, Config as PwmConfig, Sequence, SingleSequenceMode, SequencePwm, SimpleConfig};
 
 bind_interrupts!(struct Irqs {
     USBD => usb::InterruptHandler<USBD>;
@@ -250,20 +253,34 @@ async fn main(spawner: Spawner) {
 
     let mut peripheral_battery_monitor = PeripheralBatteryMonitor {};
 
+    let mut pwm_cfg = SimpleConfig::default();
+    pwm_cfg.max_duty = 20;
+
+    let pwm = SimplePwm::new_1ch(
+        p.PWM0,
+        p.P0_08,
+        &pwm_cfg,
+    );
+
+    let mut rgb_task = rgb::RgbTask::new(pwm);
+
     // Start
-    join4(
-        run_all!(matrix, adc_device),
-        run_all! {
-            batt_proc
-        },
-        keyboard.run(),
-        join5(
-            run_peripheral_manager::<4, 7, 4, 0, _>(0, &peripheral_addrs, &stack),
-            run_rmk(&keymap, driver, &stack, &mut storage, rmk_config),
-            scan_peripherals(&stack, &peripheral_addrs),
-            capslock_led.run(),
-            peripheral_battery_monitor.run(),
+    join (
+        join4(
+            run_all!(matrix, adc_device),
+            run_all! {
+                batt_proc
+            },
+            keyboard.run(),
+            join5(
+                run_peripheral_manager::<4, 7, 4, 0, _>(0, &peripheral_addrs, &stack),
+                run_rmk(&keymap, driver, &stack, &mut storage, rmk_config),
+                scan_peripherals(&stack, &peripheral_addrs),
+                capslock_led.run(),
+                peripheral_battery_monitor.run(),
+            ),
         ),
+        rgb_task.run(),
     )
     .await;
 }
