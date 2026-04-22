@@ -54,6 +54,9 @@ rand_core = { version = "0.6" }
 rand_chacha = { version = "0.3", default-features = false }
 smart-leds = "0.4.0"
 ws2812-spi = "0.5.1"
+embassy-nrf-ws2812-pwm = { version= "0.1.1", features=["nrf52840"] }
+embassy-hal-internal = "0.5.0"
+ws2812-rs = "0.3.1"
 
 [build-dependencies]
 xz2 = "0.1.7"

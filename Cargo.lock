@@ -655,6 +655,23 @@ dependencies = [
 
 [[package]]
 name = "embassy-embedded-hal"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "554e3e840696f54b4c9afcf28a0f24da431c927f4151040020416e7393d6d0d8"
+dependencies = [
+ "embassy-futures",
+ "embassy-hal-internal 0.3.0",
+ "embassy-sync 0.7.2",
+ "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-storage",
+ "embedded-storage-async",
+ "nb 1.1.0",
+]
+
+[[package]]
+name = "embassy-embedded-hal"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0641612053b2f34fc250bb63f6630ae75de46e02ade7f457268447081d709ce"
@@ -716,6 +733,17 @@ dependencies = [
 
 [[package]]
 name = "embassy-hal-internal"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95285007a91b619dc9f26ea8f55452aa6c60f7115a4edc05085cd2bd3127cd7a"
+dependencies = [
+ "cortex-m",
+ "critical-section",
+ "num-traits",
+]
+
+[[package]]
+name = "embassy-hal-internal"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f10ce10a4dfdf6402d8e9bd63128986b96a736b1a0a6680547ed2ac55d55dba"
@@ -754,6 +782,35 @@ dependencies = [
 
 [[package]]
 name = "embassy-nrf"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8d63429d74ab5786cde7c9dc9a0338ea162a4da95e204ac5345c5ae36831fdb"
+dependencies = [
+ "bitflags 2.11.0",
+ "cfg-if",
+ "cortex-m",
+ "cortex-m-rt",
+ "critical-section",
+ "document-features",
+ "embassy-embedded-hal 0.5.0",
+ "embassy-hal-internal 0.3.0",
+ "embassy-sync 0.7.2",
+ "embassy-usb-driver",
+ "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-io 0.6.1",
+ "embedded-io-async 0.6.1",
+ "embedded-storage",
+ "embedded-storage-async",
+ "fixed",
+ "nrf-pac 0.1.0",
+ "rand_core 0.6.4",
+ "rand_core 0.9.5",
+]
+
+[[package]]
+name = "embassy-nrf"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b715380574504335c40ec3016bc44598fac3c385f82959b26c41b25c30b7648d"
@@ -765,7 +822,7 @@ dependencies = [
  "critical-section",
  "defmt 1.0.1",
  "document-features",
- "embassy-embedded-hal",
+ "embassy-embedded-hal 0.6.0",
  "embassy-futures",
  "embassy-hal-internal 0.5.0",
  "embassy-sync 0.8.0",
@@ -781,9 +838,21 @@ dependencies = [
  "embedded-storage",
  "embedded-storage-async",
  "fixed",
- "nrf-pac",
+ "nrf-pac 0.3.0",
  "rand_core 0.6.4",
  "rand_core 0.9.5",
+]
+
+[[package]]
+name = "embassy-nrf-ws2812-pwm"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0ee374334ad06d9b761d2abb46f800b441c5976e2cf273da3671c8af542971f"
+dependencies = [
+ "embassy-nrf 0.8.0",
+ "embassy-time",
+ "rgb",
+ "smart-leds-trait",
 ]
 
 [[package]]
@@ -1482,7 +1551,7 @@ dependencies = [
  "cortex-m",
  "critical-section",
  "defmt 1.0.1",
- "embassy-nrf",
+ "embassy-nrf 0.10.0",
  "embassy-sync 0.8.0",
  "embedded-io 0.7.1",
  "embedded-storage",
@@ -1496,6 +1565,15 @@ version = "0.2.1"
 dependencies = [
  "bindgen",
  "doxygen-rs",
+]
+
+[[package]]
+name = "nrf-pac"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d334027d6703534f2a80de0794ae435c0e029358d28278533d3935e69b221b01"
+dependencies = [
+ "cortex-m",
 ]
 
 [[package]]
@@ -1515,7 +1593,7 @@ dependencies = [
  "bt-hci",
  "critical-section",
  "defmt 1.0.1",
- "embassy-nrf",
+ "embassy-nrf 0.10.0",
  "embassy-sync 0.8.0",
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
@@ -1837,7 +1915,9 @@ dependencies = [
  "defmt 1.0.1",
  "defmt-rtt",
  "embassy-executor",
- "embassy-nrf",
+ "embassy-hal-internal 0.5.0",
+ "embassy-nrf 0.10.0",
+ "embassy-nrf-ws2812-pwm",
  "embassy-time",
  "json",
  "nrf-mpsl",
@@ -1849,6 +1929,7 @@ dependencies = [
  "rmk",
  "smart-leds",
  "static_cell",
+ "ws2812-rs",
  "ws2812-spi",
  "xz2",
 ]
@@ -1887,6 +1968,9 @@ name = "rgb"
 version = "0.8.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4"
+dependencies = [
+ "bytemuck",
+]
 
 [[package]]
 name = "rmk"
@@ -1899,9 +1983,9 @@ dependencies = [
  "crc32fast",
  "defmt 1.0.1",
  "document-features",
- "embassy-embedded-hal",
+ "embassy-embedded-hal 0.6.0",
  "embassy-futures",
- "embassy-nrf",
+ "embassy-nrf 0.10.0",
  "embassy-sync 0.8.0",
  "embassy-time",
  "embassy-usb",
@@ -2702,6 +2786,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "ws2812-rs"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a31238e916943f43bc2cc4572e121688091483c89b31eec5e861f54853d60a4d"
+dependencies = [
+ "embassy-time",
+ "embedded-hal 1.0.0",
 ]
 
 [[package]]

@@ -1,70 +1,82 @@
-// use embassy_nrf::pwm::{Sequence, SequenceConfig, SingleSequenceMode};
-// use smart_leds::{SmartLedsWrite, RGB8};
-// use embassy_time::Timer;
-//
-// pub struct RgbTask<'a> {
-//     pwm: embassy_nrf::pwm::SequencePwm<'a>,
-//     buf: [u16; 24 * 8],
-// }
-//
-// impl <'a> RgbTask<'a> {
-//     pub fn new(pwm: embassy_nrf::pwm::SequencePwm<'a>) -> Self {
-//         Self {
-//             pwm,
-//              buf: [0; 24 * 8],
-//         }
-//     }
-//
-//     fn encode_byte(byte: u8, out: &mut [u16], mut idx: usize) -> usize {
-//         for i in (0..8).rev(){
-//             let bit = (byte >> i) & 1;
-//             out[idx] = if bit == 1 {14} else {6};
-//             idx += 1;
-//         }
-//         idx
-//     }
-//
-//     fn encode_color(&mut self, color: RGB8) {
-//         let mut idx = 0;
-//         idx = Self::encode_byte(color.g, &mut self.buf, idx);
-//         idx = Self::encode_byte(color.r, &mut self.buf, idx);
-//         idx = Self::encode_byte(color.b, &mut self.buf, idx);
-//     }
-//
-//     pub async fn run(&mut self) -> ! {
-//         loop {
-//             self.encode_color(RGB8 { r:0, g: 0, b: 50});
-//             let mut s_cfg = SequenceConfig::default();
-//             s_cfg.refresh = 0;
-//             s_cfg.end_delay = 0;
-//
-//             // let seq = Sequence::new(&self.buf, s_cfg);
-//             let _ = self.pwm.sequence(0, &seq, SingleSequenceMode::Times(1));
-//             Timer::after_millis(20).await;
-//         }
-//     }
-// }
+use embassy_nrf::pwm::{Sequencer, StartSequence, SequenceMode, Sequence, SequencePwm, Config as PwmConfig, SequenceConfig};
+use embassy_time::{Duration, Timer};
 
-use embassy_nrf::pwm::DutyCycle;
-use embassy_time::Timer;
+const LEDS: usize = 8;
+const BITS_PER_LED: usize = 24;
+const RESET_SLOTS: usize = 60;
 
-pub struct RgbTask<'a> {
-    pwm: embassy_nrf::pwm::SimplePwm<'a>,
+const DUTY_0: u16 = 6;
+const DUTY_1: u16 = 14;
+const PWM_TOP: u16 = 20;
+
+pub struct RgbTask<'d> {
+    pwm: SequencePwm<'d>,
+    buf: [u16; LEDS * BITS_PER_LED + RESET_SLOTS],
 }
 
-impl<'a> RgbTask<'a> {
-    pub fn new(pwm: embassy_nrf::pwm::SimplePwm<'a>) -> Self {
-        Self { pwm }
+impl<'d> RgbTask<'d> {
+    pub fn new(pwm: SequencePwm<'d>) -> Self {
+        Self {
+            pwm,
+            buf: [0; LEDS * BITS_PER_LED + RESET_SLOTS],
+        }
+    }
+
+    fn encode_byte(byte: u8, out: &mut [u16], offset: usize) {
+        for i in 0..8 {
+            let bit = (byte >> (7 - i)) & 1;
+            out[offset + i] = if bit == 1 { DUTY_1 } else { DUTY_0 };
+        }
+    }
+
+    fn encode_color(r: u8, g: u8, b: u8, out: &mut [u16], offset: usize) {
+        Self::encode_byte(g, out, offset);
+        Self::encode_byte(r, out, offset + 8);
+        Self::encode_byte(b, out, offset + 16);
+    }
+
+    fn fill_color(&mut self, r: u8, g: u8, b: u8) {
+        for i in 0..LEDS {
+            Self::encode_color(r, g, b, &mut self.buf, i * BITS_PER_LED);
+        }
+
+        for i in (LEDS * BITS_PER_LED)..self.buf.len() {
+            self.buf[i] = 0;
+        }
+    }
+
+    async fn write(&mut self) {
+
+        let seq_cfg = SequenceConfig::default();
+        let seq = Sequence::new(&self.buf, seq_cfg);
+
+        let seqr = Sequencer::new(&mut self.pwm, seq, None);
+
+        seqr.start(StartSequence::Zero, SequenceMode::Loop(1)).unwrap();
+        Timer::after_micros(100).await;
     }
 
     pub async fn run(&mut self) -> ! {
         loop {
-            // crude "on" signal test
-            let max = 20;
-            let duty = 10;
+            // Green
+            self.fill_color(0, 255, 0);
+            self.write().await;
+            Timer::after(Duration::from_millis(500)).await;
 
-            self.pwm.set_duty(0, DutyCycle::normal(duty));
-            Timer::after_millis(100).await;
+            // Red
+            self.fill_color(255, 0, 0);
+            self.write().await;
+            Timer::after(Duration::from_millis(500)).await;
+
+            // Blue
+            self.fill_color(0, 0, 255);
+            self.write().await;
+            Timer::after(Duration::from_millis(500)).await;
+
+            // Off
+            self.fill_color(0, 0, 0);
+            self.write().await;
+            Timer::after(Duration::from_millis(500)).await;
         }
     }
 }

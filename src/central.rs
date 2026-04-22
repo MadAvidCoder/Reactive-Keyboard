@@ -10,7 +10,7 @@ mod rgb;
 use defmt::{info, unwrap};
 use defmt_rtt as _;
 use embassy_executor::Spawner;
-use embassy_nrf::gpio::{Input, Output};
+use embassy_nrf::gpio::{Input, Level, Output, OutputDrive};
 use embassy_nrf::interrupt::{self, InterruptExt};
 use embassy_nrf::mode::Async;
 use embassy_nrf::peripherals::{RNG, SAADC, USBD};
@@ -42,8 +42,8 @@ use rmk::split::central::run_peripheral_manager;
 use rmk::{HostResources, KeymapData, initialize_keymap_and_storage, run_all, run_rmk};
 use static_cell::StaticCell;
 use vial::{VIAL_KEYBOARD_DEF, VIAL_KEYBOARD_ID};
-use ws2812_spi::Ws2812;
-use embassy_nrf::pwm::{SimplePwm, Config as PwmConfig, Sequence, SingleSequenceMode, SequencePwm, SimpleConfig};
+use embassy_nrf::gpio::AnyPin;
+use embassy_nrf::pwm::{Prescaler, SequencePwm, Config as PwmConfig, SequenceConfig, SingleSequenceMode};
 
 bind_interrupts!(struct Irqs {
     USBD => usb::InterruptHandler<USBD>;
@@ -119,6 +119,7 @@ async fn main(spawner: Spawner) {
     nrf_config.dcdc.reg0 = true;
     nrf_config.dcdc.reg1 = true;
     let p = embassy_nrf::init(nrf_config);
+
     let mpsl_p = mpsl::Peripherals::new(p.RTC0, p.TIMER0, p.TEMP, p.PPI_CH19, p.PPI_CH30, p.PPI_CH31);
     let lfclk_cfg = mpsl::raw::mpsl_clock_lfclk_cfg_t {
         source: mpsl::raw::MPSL_CLOCK_LF_SRC_RC as u8,
@@ -253,14 +254,15 @@ async fn main(spawner: Spawner) {
 
     let mut peripheral_battery_monitor = PeripheralBatteryMonitor {};
 
-    let mut pwm_cfg = SimpleConfig::default();
+    let mut pwm_cfg = PwmConfig::default();
     pwm_cfg.max_duty = 20;
+    pwm_cfg.prescaler = Prescaler::Div1;
 
-    let pwm = SimplePwm::new_1ch(
+    let pwm = SequencePwm::new_1ch(
         p.PWM0,
         p.P0_08,
-        &pwm_cfg,
-    );
+        pwm_cfg,
+    ).unwrap();
 
     let mut rgb_task = rgb::RgbTask::new(pwm);
 
