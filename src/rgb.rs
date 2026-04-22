@@ -5,8 +5,8 @@ const LEDS: usize = 8;
 const BITS_PER_LED: usize = 24;
 const RESET_SLOTS: usize = 60;
 
-const DUTY_0: u16 = 6;
-const DUTY_1: u16 = 14;
+const DUTY_0: u16 = 5;
+const DUTY_1: u16 = 15;
 const PWM_TOP: u16 = 20;
 
 pub struct RgbTask<'d> {
@@ -25,7 +25,7 @@ impl<'d> RgbTask<'d> {
     fn encode_byte(byte: u8, out: &mut [u16], offset: usize) {
         for i in 0..8 {
             let bit = (byte >> (7 - i)) & 1;
-            out[offset + i] = if bit == 1 { DUTY_1 } else { DUTY_0 };
+            out[offset + i] = if bit == 1 { 0x8000 | DUTY_1 } else { 0x8000 | DUTY_0 };
         }
     }
 

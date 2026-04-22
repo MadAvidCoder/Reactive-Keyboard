@@ -257,6 +257,8 @@ async fn main(spawner: Spawner) {
     let mut pwm_cfg = PwmConfig::default();
     pwm_cfg.max_duty = 20;
     pwm_cfg.prescaler = Prescaler::Div1;
+    pwm_cfg.sequence_load = embassy_nrf::pwm::SequenceLoad::Common;
+    // pwm_cfg.output_polarity = embassy_nrf::pwm::OutputPolarity::Inverted;
 
     let pwm = SequencePwm::new_1ch(
         p.PWM0,
