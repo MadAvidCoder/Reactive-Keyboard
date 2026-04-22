@@ -35,9 +35,14 @@ impl<'d> RgbTask<'d> {
         Self::encode_byte(b, out, offset + 16);
     }
 
+    fn set_pixel(&mut self, pix: usize, r: u8, g: u8, b: u8) {
+        // pix = 0 enc
+        Self::encode_color(r, g, b, &mut self.buf, pix * BITS_PER_LED);
+    }
+
     fn fill_color(&mut self, r: u8, g: u8, b: u8) {
         for i in 0..LEDS {
-            Self::encode_color(r, g, b, &mut self.buf, i * BITS_PER_LED);
+            self.set_pixel(i, r, g, b)
         }
 
         for i in (LEDS * BITS_PER_LED)..self.buf.len() {
