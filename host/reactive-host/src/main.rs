@@ -176,8 +176,9 @@ fn main() {
         let mut max_energy = 1e-6f32;
 
         
-        let mut tempo = Tempo::new(aubio::OnsetMode::SpecDiff, WINDOW, HOP, 44100).unwrap();
+        let mut tempo = Tempo::new(aubio::OnsetMode::Hfc, WINDOW, HOP, 44100).unwrap();
         let mut last_beat_time = -1.0;
+        let mut beat_hold = 0;
 
         loop {
             for _ in 0..WINDOW {
@@ -195,14 +196,14 @@ fn main() {
             buffer.copy_from_slice(&temp[..WINDOW]);
 
             let aubio_input = buffer.clone();
-            tempo.do_(&aubio_input, &mut [0.0f32; 1]).unwrap();
-            
-            let beat_t = tempo.get_last_s();
-            let mut beat = false;
-            
-            if beat_t > last_beat_time + 1e-4 {
-                beat = true;
-                last_beat_time = beat_t;
+            let mut out = [0.0f32; 1];
+            tempo.do_(&aubio_input, &mut out).unwrap();
+
+            let beat = out[0] > 0.0;
+            if beat {
+                beat_hold = 4;
+            } else if beat_hold > 0 {
+                beat_hold -= 1;
             }
 
             for i in 0..WINDOW {
@@ -287,7 +288,7 @@ fn main() {
 
                 let (r, g, b) = hsv_to_rgb(hue, 1.0, e);
                 
-                let mult = if beat { 1.0 } else { 0.1 };
+                let mult = if beat_hold > 0 { 1.0 } else { 0.5 };
 
                 leds[i] = LEDRecord {
                     index: i,
