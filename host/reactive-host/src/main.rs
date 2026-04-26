@@ -9,7 +9,7 @@ use rustfft::{Fft, FftPlanner};
 use rustfft::num_traits::Zero;
 use std::f32::consts::PI;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct LEDRecord {
     index: usize,
     color: (u8, u8, u8),
@@ -24,7 +24,6 @@ fn write_frame(port: &mut Box<dyn SerialPort>, records: &[LEDRecord]) -> std::io
         frame.push_str(&format!("{},{},{},{};", record.index, record.color.0, record.color.1, record.color.2));
     }
     frame.push_str("END\n");
-
     port.write_all(frame.as_bytes())?;
     port.flush()?;
 
@@ -140,6 +139,8 @@ fn main() {
         let mut buffer = vec![0f32; WINDOW];
         let mut smooth: [f32; 27] = [0.0; 27];
         let mut temp = Vec::with_capacity(WINDOW);
+        let mut heights_smooth = [0f32; 6];
+        let mut energy = [0f32; 27];
         let mut max_energy = 1e-6f32;
 
         loop {
@@ -184,39 +185,77 @@ fn main() {
                 }
             }
 
+            for i in 0..27 {
+                let weight = (i as f32 / 27.0).powf(0.5);
+                bands[i] *= weight;
+            }
+
+
+            let mut cols = [0.0f32; 6];
+
+            for i in 0..27 {
+                let v = bands[i].powf(0.5);
+
+                smooth[i] = smooth[i] * 0.5 + v * 0.5;
+                bands[i] = smooth[i];
+
+                let col = i * 6 / 27;
+                cols[col] += bands[i] * 2.0;
+            }
+
             let mut frame_max: f32 = 0.0;
 
             for i in 0..27 {
                 frame_max = frame_max.max(bands[i]);
             }
 
-            max_energy = max_energy * 0.995 + frame_max * 0.005;
+            max_energy = max_energy * 0.9 + frame_max * 0.1;
             if max_energy < 1e-3 {
                 max_energy = 1e-3;
             }
 
-            for i in 0..27 {
-                let weight = (i as f32 / 27.0).powf(0.5);
-                bands[i] *= weight;
+            let rows = 4;
+
+            let mut heights = [0usize; 6];
+
+            for c in 0..6 {
+                let target = (cols[c] / max_energy * rows as f32).min(rows as f32);
+
+                if target > heights_smooth[c] {
+                    heights_smooth[c] = target;
+                } else {
+                    heights_smooth[c] *= 0.8;
+                }
+
+                heights[c] = heights_smooth[c] as usize;
             }
 
-            for i in 0..27 {
-                let v = (bands[i] + 1e-6).log10().max(0.0);
+            for col in 0..6 {
+                for row in 0..4 {
+                    let idx = row * 6 + col;
 
-                smooth[i] = smooth[i] * 0.8 + v * 0.2;
-                bands[i] = smooth[i];
+                    if row < heights[col] {
+                        let t = row as f32 / 4.0;
 
-                let intensity = (bands[i] / max_energy).min(1.0);
+                        let r = ((1.0 - t) * 255.0) as u8;
+                        let g = (t * 180.0) as u8;
+                        let b = (t * 255.0) as u8;
 
-                let r = (intensity * 255.0) as u8;
-                let g = (intensity * intensity * 200.0) as u8;
-                let b = ((1.0 - intensity) * 255.0) as u8;
-
-                leds[i] = LEDRecord {
-                    index: i,
-                    color: (r, g, b),
-                };
+                        leds[idx] = LEDRecord {
+                            index: idx,
+                            color: (r, g, b),
+                        };
+                    } else {
+                        leds[idx] = LEDRecord {
+                            index: idx,
+                            color: (0, 0, 40),
+                        };
+                    }
+                }
             }
+            leds[24] = LEDRecord { index: 24, color: (0, 0, 0) };
+            leds[25] = LEDRecord { index: 25, color: (0, 0, 0) };
+            leds[26] = LEDRecord { index: 26, color: (0, 0, 0) };
 
             write_frame(&mut port, &leds).unwrap();
 
