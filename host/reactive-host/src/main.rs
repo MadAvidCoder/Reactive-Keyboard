@@ -9,6 +9,7 @@ use rustfft::{Fft, FftPlanner};
 use rustfft::num_traits::Zero;
 use std::f32::consts::PI;
 use rand::Rng;
+use aubio::Tempo;
 
 #[derive(Debug, Clone, Copy)]
 struct LEDRecord {
@@ -27,7 +28,7 @@ const NEIGHBORS: [&[usize]; 27] = [
     &[18], &[19], &[20],
 ];
 
-fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
     let c = v * s;
     let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
     let m = v - c;
@@ -42,9 +43,9 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
     };
 
     (
-        ((r + m) * 255.0) as u8,
-        ((g + m) * 255.0) as u8,
-        ((b + m) * 255.0) as u8,
+        ((r + m) * 255.0),
+        ((g + m) * 255.0),
+        ((b + m) * 255.0),
     )
 }
 
@@ -174,6 +175,10 @@ fn main() {
         let mut prev_bass = 0.0;
         let mut max_energy = 1e-6f32;
 
+        
+        let mut tempo = Tempo::new(aubio::OnsetMode::SpecDiff, WINDOW, HOP, 44100).unwrap();
+        let mut last_beat_time = -1.0;
+
         loop {
             for _ in 0..WINDOW {
                 let _ = consumer.try_pop();
@@ -188,6 +193,17 @@ fn main() {
                 }
             }
             buffer.copy_from_slice(&temp[..WINDOW]);
+
+            let aubio_input = buffer.clone();
+            tempo.do_(&aubio_input, &mut [0.0f32; 1]).unwrap();
+            
+            let beat_t = tempo.get_last_s();
+            let mut beat = false;
+            
+            if beat_t > last_beat_time + 1e-4 {
+                beat = true;
+                last_beat_time = beat_t;
+            }
 
             for i in 0..WINDOW {
                 input[i].re = buffer[i] * hann[i];
@@ -270,10 +286,12 @@ fn main() {
                 let hue = (200.0 - audio * 200.0) + (wave * 40.0);
 
                 let (r, g, b) = hsv_to_rgb(hue, 1.0, e);
+                
+                let mult = if beat { 1.0 } else { 0.1 };
 
                 leds[i] = LEDRecord {
                     index: i,
-                    color: (r, g, b),
+                    color: ((r * mult) as u8, (g * mult) as u8, (b * mult) as u8),
                 };
             }
 
