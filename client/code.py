@@ -6,7 +6,7 @@ pixel_pin = board.P0_08
 length = 27
 pixels = neopixel.NeoPixel(pixel_pin, length, brightness=0.5, auto_write=False, pixel_order=neopixel.GRB)
 
-serial = usb_cdc.data
+serial = usb_cdc.console
 
 in_buffer = []
 
