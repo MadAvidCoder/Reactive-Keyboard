@@ -50,37 +50,59 @@ impl<'d> RgbTask<'d> {
         }
     }
 
-    async fn write(&mut self) {
+    fn hsv_to_rgb(h: u8, s: u8, v: u8) -> (u8, u8, u8) {
+        if s == 0 {
+            return (v, v, v);
+        }
 
+        let region = h / 43;
+        let remainder = (h as u16 - (region as u16) * 43) * 6;
+
+        let p = (v as u16 * (255 - s as u16)) / 255;
+        let q = (v as u16 * (255 * 43 - s as u16 * remainder as u16) / 43) / 255;
+        let t = (v as u16 * (255 * 43 - s as u16 * (255 * 43 - remainder as u16) / 43)) / 255;
+
+        let (r, g, b) = match region {
+            0 => (v, t as u8, p as u8),
+            1 => (q as u8, v, p as u8),
+            2 => (p as u8, v, t as u8),
+            3 => (p as u8, q as u8, v),
+            4 => (t as u8, p as u8, v),
+            _ => (v, p as u8, q as u8),
+        };
+
+        (r, g, b)
+    }
+
+    async fn write(&mut self) {
         let seq_cfg = SequenceConfig::default();
         let seq = Sequence::new(&self.buf, seq_cfg);
 
         let seqr = Sequencer::new(&mut self.pwm, seq, None);
 
         seqr.start(StartSequence::Zero, SequenceMode::Loop(1)).unwrap();
-        Timer::after_micros(100).await;
+        Timer::after_micros(200).await;
     }
 
     pub async fn run(&mut self) -> ! {
+        let mut frame: u8 = 0;
+
         loop {
-            // Green
-            self.fill_color(0, 255, 0);
-            self.write().await;
-            Timer::after(Duration::from_millis(500)).await;
+            for i in 0..LEDS {
+                let hue = frame.wrapping_add((i as u8) * 32);
 
-            // Red
-            self.fill_color(255, 0, 0);
-            self.write().await;
-            Timer::after(Duration::from_millis(500)).await;
+                let (r, g, b) = Self::hsv_to_rgb(hue, 255, 255);
+                self.set_pixel(i, r, g, b);
+            }
 
-            // Blue
-            self.fill_color(0, 0, 255);
-            self.write().await;
-            Timer::after(Duration::from_millis(500)).await;
+            for i in (LEDS * BITS_PER_LED)..self.buf.len() {
+                self.buf[i] = 0;
+            }
 
-            // Off
-            self.fill_color(0, 0, 0);
             self.write().await;
+
+            frame = frame.wrapping_add(1);
+
             Timer::after(Duration::from_millis(500)).await;
         }
     }
