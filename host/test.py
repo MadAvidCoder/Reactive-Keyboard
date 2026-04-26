@@ -7,10 +7,9 @@ time.sleep(1)
 ser.reset_input_buffer()
 ser.reset_output_buffer()
 
-ser.write(b"START\n")
+out_buffer = [(i, (0,0,0)) for i in range(27)]
+ 
 for i in range(27):
-    line = f"{i},{255},{0},{0}\n"
-    ser.write(line.encode('utf-8'))
-    time.sleep(0.002)
+    out_buffer[i] = (i, (0, 255, 255))
 
-ser.write(b"END\n")
+ser.write(b"START;" + b";".join(f"{idx},{r},{g},{b}".encode('utf-8') for idx, (r, g, b) in out_buffer) + b";END\n")

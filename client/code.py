@@ -8,9 +8,6 @@ pixels = neopixel.NeoPixel(pixel_pin, length, brightness=0.5, auto_write=False, 
 
 serial = usb_cdc.console
 
-in_buffer = [(0,0,0)] * length
-confirmed = [False] * length
-
 def parse(line):
     try:
         parts = line.strip().split(',')
@@ -30,23 +27,22 @@ while True:
     if serial.in_waiting:
         line = serial.readline().decode('utf-8').strip()
 
-        if line == "START":
-            in_buffer = [(0, 0, 0)] * length
-            confirmed = [False] * length
+        if not (line.startswith("START;") and line.endswith(";END")):
             continue
         
-        elif line == "END":
-            if all(confirmed):
-                if len(in_buffer) == length:
-                    for i, color in enumerate(in_buffer):
-                        pixels[i] = color
-                    pixels.show()
-            continue
+        contents = line.split(';')[1:-1]
+        buffer = [(0,0,0)] * length
+        confirmed = [False] * length
 
-        p = parse(line)
+        for item in contents:
+            p = parse(item)
+            if p:
+                idx, color = p
+                if 0 <= idx < length:
+                    buffer[idx] = color
+                    confirmed[idx] = True
 
-        if p:
-            idx, color = p
-            if 0 <= idx < length:
-                confirmed[idx] = True
-                in_buffer[idx] = color
+        if all(confirmed):
+            for idx, color in enumerate(buffer):
+                pixels[idx] = color
+            pixels.show()
