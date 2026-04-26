@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 ringbuf = "0.4.8"
+rustfft = "6.4.1"
 serialport = "4.9.0"
 tokio = { version = "1.52.1", features = ["sync"] }
 wasapi = "0.23.0"

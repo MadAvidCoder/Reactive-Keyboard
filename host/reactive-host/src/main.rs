@@ -4,6 +4,10 @@ use std::time::Duration;
 use ringbuf::HeapRb;
 use ringbuf::traits::Split;
 use ringbuf::traits::{Producer, Consumer};
+use rustfft::num_complex::Complex;
+use rustfft::{Fft, FftPlanner};
+use rustfft::num_traits::Zero;
+use std::f32::consts::PI;
 
 #[derive(Clone, Copy)]
 struct LEDRecord {
@@ -24,10 +28,16 @@ fn write_frame(port: &mut Box<dyn SerialPort>, records: &[LEDRecord]) -> std::io
     port.write_all(frame.as_bytes())?;
     port.flush()?;
 
-    Ok(())
+    Ok(())  
 }
 
 fn main() {
+    let fft = FftPlanner::new().plan_fft_forward(WINDOW);
+    let mut input: Vec<Complex<f32>> = vec![Complex::zero(); WINDOW];
+    let hann: Vec<f32> = (0..WINDOW)
+        .map(|i| 0.5 - 0.5 * f32::cos(2.0 * PI * i as f32 / WINDOW as f32))
+        .collect();
+
     let port_name = "COM11";
 
     let mut port = serialport::new(port_name, 115_200)
@@ -124,6 +134,8 @@ fn main() {
         }
     });
 
+    let mut smooth: [f32; 27] = [0.0; 27];
+
     std::thread::spawn(move || {
         let sample_rate = sr_rx.blocking_recv().unwrap_or(44100);
 
@@ -141,15 +153,55 @@ fn main() {
                 }
             }
             buffer.copy_from_slice(&temp[..WINDOW]);
+
+            for i in 0..WINDOW {
+                input[i].re = buffer[i] * hann[i];
+                input[i].im = 0.0;
+            }
+
+            fft.process(&mut input);
+
+            let magnitudes: Vec<f32> = input[..WINDOW / 2]
+                .iter()
+                .map(|c| (c.re * c.re + c.im * c.im).sqrt())
+                .collect();
             
-            // process FFT
-            
+            let min_freq = 20.0;
+            let max_freq = sample_rate as f32 / 2.0;
+
+            let mut bands = [0f32; 27];
+
+            for (i, mag) in magnitudes.iter().enumerate() {
+                let freq = i as f32 * sample_rate as f32 / WINDOW as f32;
+
+                if freq < min_freq || freq > max_freq { continue; }
+
+                let norm = (freq / min_freq).ln() / (max_freq / min_freq).ln();
+                let band = (norm * 27.0) as usize;
+
+                if band < 27 {
+                    bands[band] += mag;
+                }
+            }
+
             for i in 0..27 {
+                let v = bands[i].sqrt();
+
+                smooth[i] = smooth[i] * 0.8 + v * 0.2;
+                bands[i] = smooth[i];
+
+                let intensity = (bands[i] * 10.0).min(1.0);
+
+                let r = (intensity * 255.0) as u8;
+                let g = ((1.0 - intensity) * 100.0) as u8;
+                let b = (255 - r) as u8;
+            
                 leds[i] = LEDRecord {
                     index: i,
-                    color: (0u8, 0u8, 255u8),
+                    color: (r, g, b),
                 };
             }
+
             write_frame(&mut port, &leds).unwrap();
 
             temp.drain(..HOP);
