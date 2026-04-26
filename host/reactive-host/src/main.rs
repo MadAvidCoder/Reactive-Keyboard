@@ -8,6 +8,7 @@ use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
 use rustfft::num_traits::Zero;
 use std::f32::consts::PI;
+use rand::Rng;
 
 #[derive(Debug, Clone, Copy)]
 struct LEDRecord {
@@ -17,6 +18,35 @@ struct LEDRecord {
 
 const WINDOW: usize = 2048;
 const HOP: usize = 512;
+
+const NEIGHBORS: [&[usize]; 27] = [
+    &[1,6], &[0,2,7], &[1,3,8], &[2,4,9], &[3,5,10], &[4,11],
+    &[0,7,12], &[1,6,8,13], &[2,7,9,14], &[3,8,10,15], &[4,9,11,16], &[5,10,17],
+    &[6,13,18], &[7,12,14,19], &[8,13,15,20], &[9,14,16,21], &[10,15,17,22], &[11,16,23],
+    &[12,19], &[13,18,20], &[14,19,21], &[15,20,22], &[16,21,23], &[17,22],
+    &[18], &[19], &[20],
+];
+
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+    let c = v * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = v - c;
+
+    let (r, g, b) = match h as i32 {
+        h if h < 60 => (c, x, 0.0),
+        h if h < 120 => (x, c, 0.0),
+        h if h < 180 => (0.0, c, x),
+        h if h < 240 => (0.0, x, c),
+        h if h < 300 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+
+    (
+        ((r + m) * 255.0) as u8,
+        ((g + m) * 255.0) as u8,
+        ((b + m) * 255.0) as u8,
+    )
+}
 
 fn write_frame(port: &mut Box<dyn SerialPort>, records: &[LEDRecord]) -> std::io::Result<()> {
     let mut frame = String::from("START;");
@@ -141,6 +171,7 @@ fn main() {
         let mut temp = Vec::with_capacity(WINDOW);
         let mut heights_smooth = [0f32; 6];
         let mut energy = [0f32; 27];
+        let mut prev_bass = 0.0;
         let mut max_energy = 1e-6f32;
 
         loop {
@@ -190,72 +221,58 @@ fn main() {
                 bands[i] *= weight;
             }
 
+            let bass = bands[0] + bands[1] + bands[2];
+            let mids = bands[5] + bands[6] + bands[7];
+            let highs = bands[15] + bands[16] + bands[17];
 
-            let mut cols = [0.0f32; 6];
+            if bass > 0.01 {
+                let center = 13;
+                energy[center] += bass * 10.0;
 
-            for i in 0..27 {
-                let v = bands[i].powf(0.5);
-
-                smooth[i] = smooth[i] * 0.5 + v * 0.5;
-                bands[i] = smooth[i];
-
-                let col = i * 6 / 27;
-                cols[col] += bands[i] * 2.0;
-            }
-
-            let mut frame_max: f32 = 0.0;
-
-            for i in 0..27 {
-                frame_max = frame_max.max(bands[i]);
-            }
-
-            max_energy = max_energy * 0.9 + frame_max * 0.1;
-            if max_energy < 1e-3 {
-                max_energy = 1e-3;
-            }
-
-            let rows = 4;
-
-            let mut heights = [0usize; 6];
-
-            for c in 0..6 {
-                let target = (cols[c] / max_energy * rows as f32).min(rows as f32);
-
-                if target > heights_smooth[c] {
-                    heights_smooth[c] = target;
-                } else {
-                    heights_smooth[c] *= 0.8;
-                }
-
-                heights[c] = heights_smooth[c] as usize;
-            }
-
-            for col in 0..6 {
-                for row in 0..4 {
-                    let idx = row * 6 + col;
-
-                    if row < heights[col] {
-                        let t = row as f32 / 4.0;
-
-                        let r = ((1.0 - t) * 255.0) as u8;
-                        let g = (t * 180.0) as u8;
-                        let b = (t * 255.0) as u8;
-
-                        leds[idx] = LEDRecord {
-                            index: idx,
-                            color: (r, g, b),
-                        };
-                    } else {
-                        leds[idx] = LEDRecord {
-                            index: idx,
-                            color: (0, 0, 40),
-                        };
-                    }
+                for &n in NEIGHBORS[center] {
+                    energy[n] += bass * 5.0;
                 }
             }
-            leds[24] = LEDRecord { index: 24, color: (0, 0, 0) };
-            leds[25] = LEDRecord { index: 25, color: (0, 0, 0) };
-            leds[26] = LEDRecord { index: 26, color: (0, 0, 0) };
+
+            if highs > 0.005 {  
+                let idx = rand::random_range(0..27);
+                energy[idx] += highs * 3.0;
+            }
+
+            let mut new_energy = [0.0f32; 27];
+
+            for i in 0..27 {
+                new_energy[i] += energy[i] * 0.6;
+
+                for &n in NEIGHBORS[i] {
+                    new_energy[n] += energy[i] * 0.1;
+                }
+            }
+
+            for i in 0..27 {
+                new_energy[i] *= 0.6; // decay
+            }
+
+            energy = new_energy;
+
+
+            let t = std::time::Instant::now().elapsed().as_millis() as f32 * 0.01;
+
+            for i in 0..27 {
+                let wave = ((i as f32 * 0.5 + t).sin() * 0.5 + 0.5);
+                let audio = energy[i].min(1.0);
+
+                let e = wave * (0.3 + audio * 0.7);
+
+                let hue = (200.0 - audio * 200.0) + (wave * 40.0);
+
+                let (r, g, b) = hsv_to_rgb(hue, 1.0, e);
+
+                leds[i] = LEDRecord {
+                    index: i,
+                    color: (r, g, b),
+                };
+            }
 
             write_frame(&mut port, &leds).unwrap();
 
