@@ -280,15 +280,15 @@ fn main() {
 
             for i in 0..27 {
                 let wave = ((i as f32 * 0.5 + t).sin() * 0.65 + 0.35);
-                let audio = energy[i].min(1.0);
+                let audio = energy[i].min(1.0).powf(0.8);
 
-                let e = wave * (0.3 + audio * 0.7);
+                let e = wave * (0.3 + audio * 0.7) + ((t * 0.1) % 1.0 * 0.2);
 
-                let hue = (200.0 - audio * 200.0) + (wave * 40.0);
+                let hue = ((200.0 - audio * 200.0) + (wave * 40.0) + rand::random_range(-6i32..6i32) as f32) % 360.0;
 
                 let (r, g, b) = hsv_to_rgb(hue, 1.0, e);
                 
-                let mult = if beat_hold > 0 { 1.0 } else { 0.5 };
+                let mult = if beat_hold > 0 { 1.0 } else { 0.68 };
 
                 leds[i] = LEDRecord {
                     index: i,
