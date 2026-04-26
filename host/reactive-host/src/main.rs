@@ -134,13 +134,13 @@ fn main() {
         }
     });
 
-    let mut smooth: [f32; 27] = [0.0; 27];
-
     std::thread::spawn(move || {
         let sample_rate = sr_rx.blocking_recv().unwrap_or(44100);
 
         let mut buffer = vec![0f32; WINDOW];
+        let mut smooth: [f32; 27] = [0.0; 27];
         let mut temp = Vec::with_capacity(WINDOW);
+        let mut max_energy = 1e-6f32;
 
         loop {
             while temp.len() < WINDOW {
@@ -166,7 +166,7 @@ fn main() {
                 .map(|c| (c.re * c.re + c.im * c.im).sqrt())
                 .collect();
             
-            let min_freq = 20.0;
+            let min_freq = 40.0;
             let max_freq = sample_rate as f32 / 2.0;
 
             let mut bands = [0f32; 27];
@@ -176,7 +176,7 @@ fn main() {
 
                 if freq < min_freq || freq > max_freq { continue; }
 
-                let norm = (freq / min_freq).ln() / (max_freq / min_freq).ln();
+                let norm = ((freq / min_freq).ln() / (max_freq / min_freq).ln()).powf(0.5);
                 let band = (norm * 27.0) as usize;
 
                 if band < 27 {
@@ -184,18 +184,34 @@ fn main() {
                 }
             }
 
+            let mut frame_max: f32 = 0.0;
+
             for i in 0..27 {
-                let v = bands[i].sqrt();
+                frame_max = frame_max.max(bands[i]);
+            }
+
+            max_energy = max_energy * 0.995 + frame_max * 0.005;
+            if max_energy < 1e-3 {
+                max_energy = 1e-3;
+            }
+
+            for i in 0..27 {
+                let weight = (i as f32 / 27.0).powf(0.5);
+                bands[i] *= weight;
+            }
+
+            for i in 0..27 {
+                let v = (bands[i] + 1e-6).log10().max(0.0);
 
                 smooth[i] = smooth[i] * 0.8 + v * 0.2;
                 bands[i] = smooth[i];
 
-                let intensity = (bands[i] * 10.0).min(1.0);
+                let intensity = (bands[i] / max_energy).min(1.0);
 
                 let r = (intensity * 255.0) as u8;
-                let g = ((1.0 - intensity) * 100.0) as u8;
-                let b = (255 - r) as u8;
-            
+                let g = (intensity * intensity * 200.0) as u8;
+                let b = ((1.0 - intensity) * 255.0) as u8;
+
                 leds[i] = LEDRecord {
                     index: i,
                     color: (r, g, b),
