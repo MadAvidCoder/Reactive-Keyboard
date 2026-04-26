@@ -3,7 +3,7 @@ use std::io::Write;
 use std::time::Duration;
 use ringbuf::HeapRb;
 use ringbuf::traits::Split;
-use ringbuf::traits::{Producer, Consumer};
+use ringbuf::traits::{Producer, Observer, Consumer};
 use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
 use rustfft::num_traits::Zero;
@@ -78,7 +78,7 @@ fn main() {
     
     let mut leds: [LEDRecord; 27] = [LEDRecord { index: 0, color: (0u8, 0u8, 0u8) }; 27];
 
-    let rb = HeapRb::<f32>::new(48000usize * 2usize);
+    let rb = HeapRb::<f32>::new(WINDOW * 4);
     let (mut producer, mut consumer) = rb.split();
 
     // let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
@@ -175,11 +175,14 @@ fn main() {
         let mut max_energy = 1e-6f32;
 
         loop {
+            for _ in 0..WINDOW {
+                let _ = consumer.try_pop();
+            }
+            
             while temp.len() < WINDOW {
                 match consumer.try_pop() {
                     Some(s) => temp.push(s),
                     None => {
-                        std::thread::yield_now();
                         continue;
                     }
                 }
@@ -195,7 +198,7 @@ fn main() {
 
             let magnitudes: Vec<f32> = input[..WINDOW / 2]
                 .iter()
-                .map(|c| (c.re * c.re + c.im * c.im).sqrt())
+                .map(|c| (c.re * c.re + c.im * c.im).sqrt() * 0.87)
                 .collect();
             
             let min_freq = 40.0;
@@ -250,7 +253,7 @@ fn main() {
             }
 
             for i in 0..27 {
-                new_energy[i] *= 0.6; // decay
+                new_energy[i] *= 0.6;
             }
 
             energy = new_energy;
@@ -259,7 +262,7 @@ fn main() {
             let t = std::time::Instant::now().elapsed().as_millis() as f32 * 0.01;
 
             for i in 0..27 {
-                let wave = ((i as f32 * 0.5 + t).sin() * 0.5 + 0.5);
+                let wave = ((i as f32 * 0.5 + t).sin() * 0.65 + 0.35);
                 let audio = energy[i].min(1.0);
 
                 let e = wave * (0.3 + audio * 0.7);
