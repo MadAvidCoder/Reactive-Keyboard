@@ -7,6 +7,19 @@ struct LEDRecord {
     color: (u8, u8, u8),
 }
 
+fn write_frame(port: &mut Box<dyn SerialPort>, records: &[LEDRecord]) -> std::io::Result<()> {
+    let mut frame = String::from("START;");
+    for record in records {
+        frame.push_str(&format!("{},{},{},{};", record.index, record.color.0, record.color.1, record.color.2));
+    }
+    frame.push_str("END\n");
+
+    port.write_all(frame.as_bytes())?;
+    port.flush()?;
+
+    Ok(())
+}
+
 fn main() {
     let port_name = "COM11";
 
@@ -19,19 +32,23 @@ fn main() {
     
     let mut buffer: Vec<LEDRecord> = Vec::new();
     
-    for i in 0..27 {
-        buffer.push(LEDRecord {
-            index: i,
-            color: (10, 255, 10),
-        });
-    }
+    let mut counter: i32 = 0;
+    let mut direction: i32 = 1;
 
-    let mut frame = String::from("START;");
-    for record in buffer {
-        frame.push_str(&format!("{},{},{},{};", record.index, record.color.0, record.color.1, record.color.2));
-    }
-    frame.push_str("END\n");
+    loop {
+        counter += direction;
+        if counter >= 255 || counter <= 0 {
+            direction *= -1;
+        }
+        buffer.clear();
 
-    port.write_all(frame.as_bytes()).unwrap();
-    port.flush().unwrap();
+        for i in 0..27 {
+            buffer.push(LEDRecord {
+                index: i,
+                color: (0u8, counter as u8, 0u8),
+            });
+        }
+
+        write_frame(&mut port, &buffer).unwrap();
+    }
 }
