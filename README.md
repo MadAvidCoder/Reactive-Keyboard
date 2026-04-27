@@ -7,7 +7,9 @@
 
 A custom firmware I built for my keyboard, which reacts to system audio, turning my desk into a light-show synced with whatever is playing on my computer!
 
-[demo video](TBA)
+### Check out the demo video on the [releases page](https://github.com/MadAvidCoder/reactive-keyboard/releases/latest)!
+
+<img alt="image" src="https://github.com/user-attachments/assets/f9a52a44-5238-44ba-8631-6e12961b626f" />
 
 ## Features
 - Runs it in a terminal window, and it will automatically connect to the custom keyboard firmware (no bloated GUIs!) 
