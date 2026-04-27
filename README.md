@@ -7,9 +7,9 @@
 
 A custom firmware I built for my keyboard, which reacts to system audio, turning my desk into a light-show synced with whatever is playing on my computer!
 
-### Check out the demo video on the [releases page](https://github.com/MadAvidCoder/reactive-keyboard/releases/latest)!
+### Check out a better quality demo video on the [releases page](https://github.com/MadAvidCoder/reactive-keyboard/releases/latest)!
 
-<img alt="image" src="https://github.com/user-attachments/assets/f9a52a44-5238-44ba-8631-6e12961b626f" />
+https://github.com/user-attachments/assets/606a91cf-dfa1-4ccf-99e9-24afb16fbc22
 
 ## Features
 - Runs it in a terminal window, and it will automatically connect to the custom keyboard firmware (no bloated GUIs!) 
@@ -32,6 +32,8 @@ A custom firmware I built for my keyboard, which reacts to system audio, turning
 - When it receives LED data, it buffers it until it constructs a full frame
 - If the frame was uncorrupted, it renders the LED data on the keyboard's RGB LEDs
 - Simultaneously, it scans the keyboard matrix, and reports HID events back to the host, allowing for typing while effects run *(slight latency can occur)*
+
+<img width="350" alt="image" src="https://github.com/user-attachments/assets/f9a52a44-5238-44ba-8631-6e12961b626f" />
 
 ## Installation
 > [!IMPORTANT]
